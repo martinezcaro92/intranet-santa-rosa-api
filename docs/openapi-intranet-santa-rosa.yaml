@@ -1,0 +1,850 @@
+openapi: 3.0.3
+info:
+  title: Intranet · Centro Médico Santa Rosa de Lima
+  version: 1.0.0
+  description: |
+    API de ejemplo de la **intranet de gestión** del Centro Médico Santa Rosa de Lima
+    (Proyecto Intermodular · DAW). Backend en **FastAPI** con autenticación **JWT**
+    y permisos por **roles**.
+
+    **Roles:** `personal` (todo el personal), `admin`, `direccion`, `supervision`,
+    `mantenimiento`, `suministros` y `rrss`. El rol `admin` tiene acceso total.
+
+    **Cómo probarla con el servidor de ejemplo:** ejecuta `POST /auth/google` con el email
+    de un usuario de ejemplo en `id_token`, copia el `access_token`, pulsa **Authorize** y pégalo.
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+    description: Servidor local de ejemplo (uvicorn)
+tags:
+  - name: Autenticación
+    description: Login con Google (OAuth) y tokens JWT
+  - name: Usuarios
+    description: Altas, estados y roles (administración)
+  - name: Anuncios
+    description: Tablón de anuncios por servicio
+  - name: Guardias
+    description: Asignación de guardias por rondas
+  - name: Ausencias
+    description: Ausencias, justificante, PDF y firma
+  - name: Tickets
+    description: Mantenimiento, suministros y publicaciones RRSS
+  - name: Reservas
+    description: Salas y equipos sin solapamientos
+  - name: Dirección
+    description: Indicadores y auditoría
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ------------------------------------------------------------------ AUTENTICACIÓN
+  /auth/google:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión con Google (OAuth)
+      description: |
+        Valida el token de Google y devuelve los tokens JWT de la intranet.
+        Si el email no está registrado, se da de alta en estado `pendiente` y se responde 403.
+        En el servidor de ejemplo (DEMO_MODE) se escribe el email en `id_token`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginGoogle' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tokens' }
+        '403':
+          description: Usuario pendiente de confirmación o inactivo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { detail: "Alta registrada: pendiente de confirmación por un administrador" }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  /auth/refresh:
+    post:
+      tags: [Autenticación]
+      summary: Renovar el access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshIn' }
+      responses:
+        '200':
+          description: Nuevo access token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessToken' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Datos del usuario autenticado
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  # ------------------------------------------------------------------ USUARIOS
+  /usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios
+      description: 'Rol requerido: `admin`.'
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/EstadoUsuario' }
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /usuarios/{usuario_id}:
+    patch:
+      tags: [Usuarios]
+      summary: Modificar parcialmente un usuario
+      description: |
+        Rol requerido: `admin`. **PATCH** porque solo se envían los campos que cambian.
+        Uso típico: aprobar un alta pendiente con `{"estado": "activo"}`.
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsuarioPatch' }
+            example: { estado: activo }
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /usuarios/{usuario_id}/roles:
+    put:
+      tags: [Usuarios]
+      summary: Sustituir los roles de un usuario
+      description: |
+        Rol requerido: `admin`. **PUT** porque se sustituye la lista COMPLETA de roles.
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RolesIn' }
+      responses:
+        '200':
+          description: Roles actualizados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  # ------------------------------------------------------------------ ANUNCIOS
+  /anuncios:
+    get:
+      tags: [Anuncios]
+      summary: Ver el tablón de anuncios
+      description: Anuncios generales y del servicio del usuario. Los caducados no se muestran.
+      responses:
+        '200':
+          description: Anuncios visibles (destacados primero)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Anuncio' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Anuncios]
+      summary: Publicar un anuncio
+      description: 'Roles requeridos: `direccion` o `supervision`. Si es destacado, genera una notificación.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnuncioIn' }
+      responses:
+        '201':
+          description: Anuncio creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Anuncio' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  # ------------------------------------------------------------------ GUARDIAS
+  /guardias:
+    get:
+      tags: [Guardias]
+      summary: Consultar guardias
+      parameters:
+        - name: fecha
+          in: query
+          schema: { type: string, format: date, example: '2026-10-05' }
+        - name: franja
+          in: query
+          schema: { $ref: '#/components/schemas/Franja' }
+      responses:
+        '200':
+          description: Guardias que cumplen los filtros
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Guardia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /guardias/asignar:
+    post:
+      tags: [Guardias]
+      summary: Asignar guardias por rondas
+      description: |
+        Rol requerido: `supervision`. Ejecuta el algoritmo por rondas para un hueco (fecha + franja):
+        elige a los profesionales disponibles con MENOS guardias realizadas en ese hueco; si hay empate, sorteo.
+        **POST** porque no es idempotente: lanza un proceso que crea guardias nuevas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AsignarGuardiaIn' }
+      responses:
+        '201':
+          description: Guardias creadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Guardia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /guardias/{guardia_id}:
+    patch:
+      tags: [Guardias]
+      summary: Registrar quién realiza la guardia
+      description: |
+        Rol requerido: `supervision`. Distingue entre `asignado_a` (le corresponde por ronda) y
+        `realizada_por` (quien la cubre finalmente). Suma 1 al contador de quien la realiza.
+      parameters:
+        - name: guardia_id
+          in: path
+          required: true
+          schema: { type: string, example: g101 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GuardiaPatch' }
+      responses:
+        '200':
+          description: Guardia registrada como realizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Guardia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  # ------------------------------------------------------------------ AUSENCIAS
+  /ausencias:
+    post:
+      tags: [Ausencias]
+      summary: Registrar una ausencia
+      description: |
+        Las ausencias `generica` nacen en estado `pendiente_justificante`; el resto, en `registrada`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AusenciaIn' }
+      responses:
+        '201':
+          description: Ausencia registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ausencia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  /ausencias/{ausencia_id}/justificante:
+    post:
+      tags: [Ausencias]
+      summary: Adjuntar justificante
+      description: Solo para ausencias `generica` en estado `pendiente_justificante`.
+      parameters:
+        - $ref: '#/components/parameters/AusenciaId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                  description: PDF o imagen del justificante
+      responses:
+        '200':
+          description: Justificante adjuntado (estado `justificada`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ausencia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /ausencias/{ausencia_id}/pdf:
+    get:
+      tags: [Ausencias]
+      summary: Descargar el documento PDF de la ausencia
+      description: Autocompleta los datos personales desde el perfil (cuenta de Google vinculada).
+      parameters:
+        - $ref: '#/components/parameters/AusenciaId'
+      responses:
+        '200':
+          description: Documento PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /ausencias/{ausencia_id}/firma:
+    post:
+      tags: [Ausencias]
+      summary: Firmar el documento
+      description: |
+        Firma `manuscrita` (imagen capturada en pantalla, en base64) o `autofirma`
+        (firma electrónica, objetivo de mejor esfuerzo: 501 en el servidor de ejemplo).
+      parameters:
+        - $ref: '#/components/parameters/AusenciaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FirmaIn' }
+      responses:
+        '200':
+          description: Documento firmado (estado `firmada`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ausencia' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422': { $ref: '#/components/responses/Validacion' }
+        '501':
+          description: AutoFirma no disponible
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ------------------------------------------------------------------ TICKETS
+  /tickets:
+    get:
+      tags: [Tickets]
+      summary: Listar tickets
+      description: Cada usuario ve los tickets que ha creado y los de los tipos de los que es responsable.
+      parameters:
+        - name: tipo
+          in: query
+          schema: { $ref: '#/components/schemas/TipoTicket' }
+        - name: estado
+          in: query
+          schema: { $ref: '#/components/schemas/EstadoTicket' }
+      responses:
+        '200':
+          description: Tickets visibles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ticket' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Tickets]
+      summary: Crear un ticket
+      description: |
+        Entidad genérica de solicitudes. Notifica al responsable del tipo.
+        En los tickets `rrss` se genera un borrador de texto con IA (`datos.borrador_ia`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketIn' }
+            examples:
+              mantenimiento:
+                summary: Incidencia de mantenimiento
+                value:
+                  tipo: mantenimiento
+                  titulo: Camilla con rueda rota
+                  datos: { dispositivo: Camilla 12, ubicacion: Urgencias · Pasillo B }
+              suministros:
+                summary: Petición de suministros
+                value:
+                  tipo: suministros
+                  titulo: Guantes de nitrilo talla M
+                  datos: { articulos: [Guantes nitrilo M x 20 cajas], precio_total: 180.5, requiere_presupuesto: false }
+              rrss:
+                summary: Publicación en redes sociales
+                value:
+                  tipo: rrss
+                  titulo: Jornada de puertas abiertas
+                  datos: { actividad: Puertas abiertas, servicio: Pediatría, descripcion: Visita guiada para familias. }
+      responses:
+        '201':
+          description: Ticket creado en estado `pendiente`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  /tickets/{ticket_id}:
+    patch:
+      tags: [Tickets]
+      summary: Cambiar el estado de un ticket
+      description: |
+        Solo el responsable del tipo. Transiciones válidas: `pendiente` → `en_curso` → `finalizado`.
+        **PATCH** porque solo se modifica el campo `estado`.
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema: { type: string, example: t1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketPatch' }
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  # ------------------------------------------------------------------ RESERVAS
+  /reservas:
+    get:
+      tags: [Reservas]
+      summary: Consultar reservas
+      parameters:
+        - name: recurso_id
+          in: query
+          schema: { type: string, example: sala-reuniones-1 }
+        - name: fecha
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Reservas que cumplen los filtros
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reserva' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Reservas]
+      summary: Reservar sala o equipo
+      description: Devuelve **409** si la franja solapa con otra reserva del mismo recurso.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservaIn' }
+      responses:
+        '201':
+          description: Reserva creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reserva' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422': { $ref: '#/components/responses/Validacion' }
+
+  # ------------------------------------------------------------------ DIRECCIÓN
+  /dashboard/kpis:
+    get:
+      tags: [Dirección]
+      summary: Indicadores para la dirección
+      description: 'Rol requerido: `direccion`.'
+      responses:
+        '200':
+          description: Indicadores agregados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Kpis' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /auditoria:
+    get:
+      tags: [Dirección]
+      summary: Consultar el registro de auditoría
+      description: 'Rol requerido: `direccion`. Devuelve primero los registros más recientes.'
+      parameters:
+        - name: usuario_id
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+      responses:
+        '200':
+          description: Registros de auditoría
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RegistroAuditoria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UsuarioId:
+      name: usuario_id
+      in: path
+      required: true
+      schema: { type: string, example: u9 }
+    AusenciaId:
+      name: ausencia_id
+      in: path
+      required: true
+      schema: { type: string, example: aus101 }
+
+  responses:
+    NoAutenticado:
+      description: Falta el token o no es válido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { detail: No autenticado }
+    SinPermiso:
+      description: El usuario no tiene el rol necesario
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { detail: 'Se requiere uno de estos roles: admin' }
+    NoEncontrado:
+      description: El recurso no existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { detail: Recurso no encontrado }
+    Conflicto:
+      description: Conflicto con el estado actual (duplicado, solapamiento o transición no válida)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { detail: 'Transición no permitida: pendiente -> finalizado' }
+    Validacion:
+      description: Datos de entrada no válidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        detail: { type: string }
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                properties:
+                  loc: { type: array, items: { type: string } }
+                  msg: { type: string }
+                  type: { type: string }
+
+    # ---------- Enumerados
+    Franja:
+      type: string
+      enum: [manana, tarde, noche]
+    EstadoUsuario:
+      type: string
+      enum: [activo, pendiente, inactivo]
+    TipoTicket:
+      type: string
+      enum: [mantenimiento, suministros, rrss]
+    EstadoTicket:
+      type: string
+      enum: [pendiente, en_curso, finalizado]
+
+    # ---------- Autenticación
+    LoginGoogle:
+      type: object
+      required: [id_token]
+      properties:
+        id_token:
+          type: string
+          description: Token de Google. En el servidor de ejemplo, el email del usuario.
+          example: laura.martinez@santarosadelima.es
+    RefreshIn:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    Tokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, example: bearer }
+    AccessToken:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: bearer }
+
+    # ---------- Usuarios
+    Usuario:
+      type: object
+      properties:
+        id: { type: string, example: u3 }
+        nombre: { type: string, example: Ana García López }
+        email: { type: string, format: email, example: ana.garcia@santarosadelima.es }
+        servicio: { type: string, example: Urgencias }
+        roles:
+          type: array
+          items: { type: string }
+          example: [personal]
+        estado: { $ref: '#/components/schemas/EstadoUsuario' }
+        disponibilidad:
+          type: array
+          description: Huecos de guardia en los que está disponible
+          items: { type: string }
+          example: [lunes-noche, martes-noche]
+    UsuarioPatch:
+      type: object
+      description: Solo se envían los campos que cambian
+      properties:
+        estado: { $ref: '#/components/schemas/EstadoUsuario' }
+        servicio: { type: string }
+    RolesIn:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [personal, admin, direccion, supervision, mantenimiento, suministros, rrss]
+          example: [personal, supervision]
+
+    # ---------- Anuncios
+    AnuncioIn:
+      type: object
+      required: [titulo, cuerpo]
+      properties:
+        titulo: { type: string, minLength: 3, example: Cambio de turno en Urgencias }
+        cuerpo: { type: string, example: Desde el día 1 el turno de noche empieza a las 21:00. }
+        servicio:
+          type: string
+          nullable: true
+          description: null = anuncio general para todo el centro
+          example: Urgencias
+        destacado: { type: boolean, default: false }
+        caduca: { type: string, format: date-time, nullable: true }
+    Anuncio:
+      allOf:
+        - $ref: '#/components/schemas/AnuncioIn'
+        - type: object
+          properties:
+            id: { type: string, example: a1 }
+            autor_id: { type: string, example: u1 }
+            publicado: { type: string, format: date-time }
+
+    # ---------- Guardias
+    AsignarGuardiaIn:
+      type: object
+      required: [fecha, franja]
+      properties:
+        fecha: { type: string, format: date, example: '2026-10-05' }
+        franja: { $ref: '#/components/schemas/Franja' }
+        plazas: { type: integer, minimum: 1, maximum: 5, default: 1 }
+    GuardiaPatch:
+      type: object
+      required: [realizada_por]
+      properties:
+        realizada_por: { type: string, example: u4 }
+    Guardia:
+      type: object
+      properties:
+        id: { type: string, example: g101 }
+        fecha: { type: string, format: date }
+        franja: { $ref: '#/components/schemas/Franja' }
+        hueco: { type: string, example: lunes-noche }
+        asignado_a: { type: string, description: Le corresponde por ronda, example: u3 }
+        realizada_por: { type: string, nullable: true, description: Quién la cubre finalmente, example: u4 }
+        estado: { type: string, enum: [asignada, realizada] }
+
+    # ---------- Ausencias
+    AusenciaIn:
+      type: object
+      required: [tipo, fecha]
+      properties:
+        tipo: { type: string, enum: [generica, administrativa, actividad_externa] }
+        fecha: { type: string, format: date, example: '2026-10-07' }
+        dia_completo: { type: boolean, default: true }
+        franjas:
+          type: array
+          description: Solo si no es día completo
+          items: { $ref: '#/components/schemas/Franja' }
+        motivo: { type: string, nullable: true, example: Consulta médica }
+    Ausencia:
+      allOf:
+        - $ref: '#/components/schemas/AusenciaIn'
+        - type: object
+          properties:
+            id: { type: string, example: aus101 }
+            usuario_id: { type: string }
+            estado: { type: string, enum: [pendiente_justificante, registrada, justificada, firmada] }
+            justificante: { type: string, nullable: true }
+            documento_generado: { type: boolean }
+            firma: { type: string, nullable: true }
+    FirmaIn:
+      type: object
+      required: [metodo]
+      properties:
+        metodo: { type: string, enum: [manuscrita, autofirma] }
+        imagen_base64: { type: string, nullable: true, description: PNG de la firma capturada en pantalla }
+
+    # ---------- Tickets
+    TicketIn:
+      type: object
+      required: [tipo, titulo]
+      properties:
+        tipo: { $ref: '#/components/schemas/TipoTicket' }
+        titulo: { type: string, minLength: 3 }
+        datos:
+          type: object
+          additionalProperties: true
+          description: Campos específicos del tipo de ticket (campo flexible)
+    TicketPatch:
+      type: object
+      required: [estado]
+      properties:
+        estado: { $ref: '#/components/schemas/EstadoTicket' }
+    Ticket:
+      allOf:
+        - $ref: '#/components/schemas/TicketIn'
+        - type: object
+          properties:
+            id: { type: string, example: t1 }
+            solicitante_id: { type: string }
+            responsable_rol: { type: string, example: mantenimiento }
+            estado: { $ref: '#/components/schemas/EstadoTicket' }
+            creado: { type: string, format: date-time }
+            historial:
+              type: array
+              items:
+                type: object
+                properties:
+                  de: { type: string }
+                  a: { type: string }
+                  por: { type: string }
+                  fecha: { type: string, format: date-time }
+
+    # ---------- Reservas
+    ReservaIn:
+      type: object
+      required: [recurso_id, inicio, fin]
+      properties:
+        recurso_id:
+          type: string
+          enum: [sala-reuniones-1, aula-formacion, ecografo-portatil, proyector-1]
+        inicio: { type: string, format: date-time, example: '2026-10-06T10:00:00' }
+        fin: { type: string, format: date-time, example: '2026-10-06T11:00:00' }
+        motivo: { type: string, nullable: true }
+    Reserva:
+      allOf:
+        - $ref: '#/components/schemas/ReservaIn'
+        - type: object
+          properties:
+            id: { type: string, example: r101 }
+            usuario_id: { type: string }
+
+    # ---------- Dirección
+    Kpis:
+      type: object
+      properties:
+        usuarios_por_estado: { type: object, additionalProperties: { type: integer } }
+        guardias:
+          type: object
+          properties:
+            asignadas: { type: integer }
+            realizadas: { type: integer }
+            cubiertas_por_otro_profesional: { type: integer }
+            contadores_por_hueco: { type: object, additionalProperties: true }
+        ausencias_por_tipo: { type: object, additionalProperties: { type: integer } }
+        tickets_por_tipo_y_estado: { type: object, additionalProperties: { type: integer } }
+        rrss_porcentaje_publicado: { type: number }
+        reservas_totales: { type: integer }
+        notificaciones_enviadas: { type: integer }
+    RegistroAuditoria:
+      type: object
+      properties:
+        fecha: { type: string, format: date-time }
+        usuario_id: { type: string, nullable: true }
+        accion: { type: string, example: asignar_guardias }
+        detalle: { type: string }
