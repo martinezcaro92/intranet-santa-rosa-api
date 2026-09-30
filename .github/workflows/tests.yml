@@ -1,0 +1,16 @@
+# Integración continua (opcional): ejecuta los tests en cada push.
+# La publicación en GitHub Pages NO depende de este flujo.
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest

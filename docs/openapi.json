@@ -1,0 +1,2480 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Intranet · Centro Médico Santa Rosa de Lima",
+    "description": "\nAPI de ejemplo de la **intranet de gestión** del Centro Médico Santa Rosa de Lima.\n\nProyecto didáctico del Proyecto Intermodular (DAW): muestra cómo definir e implementar\nlos endpoints de una intranet con **FastAPI**, **JWT** y control de permisos por **roles**.\n\n**Cómo probarla:** ejecuta `POST /api/v1/auth/google` con el email de un usuario de ejemplo\n(p. ej. `laura.martinez@santarosadelima.es`), copia el `access_token`, pulsa **Authorize**\ny pégalo. Los datos se guardan en memoria y se reinician al reiniciar el servidor.\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/google": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Iniciar sesión con Google (OAuth)",
+        "description": "Valida el token de Google y devuelve los tokens JWT de la intranet.\n\n**Modo demostración (DEMO_MODE=true):** en `id_token` se escribe directamente el email\nde un usuario de ejemplo. Si el email no existe, se da de alta en estado *pendiente*\ny debe aprobarlo un administrador (`PATCH /usuarios/{id}`).",
+        "operationId": "login_google_api_v1_auth_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginGoogle"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Usuario pendiente de confirmación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Verificación real de Google no configurada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Renovar el access token",
+        "operationId": "refrescar_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Datos del usuario autenticado",
+        "operationId": "perfil_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/usuarios": {
+      "get": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Listar usuarios",
+        "operationId": "listar_api_v1_usuarios_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "activo",
+                    "pendiente",
+                    "inactivo"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrar por estado",
+              "title": "Estado"
+            },
+            "description": "Filtrar por estado"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Usuario"
+                  },
+                  "title": "Response Listar Api V1 Usuarios Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/{usuario_id}": {
+      "patch": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Modificar parcialmente un usuario",
+        "description": "Actualización PARCIAL: solo se modifican los campos enviados.\n\nUso típico: aprobar un alta pendiente enviando `{\"estado\": \"activo\"}`.",
+        "operationId": "modificar_api_v1_usuarios__usuario_id__patch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/{usuario_id}/roles": {
+      "put": {
+        "tags": [
+          "Usuarios"
+        ],
+        "summary": "Sustituir los roles de un usuario",
+        "description": "Sustitución COMPLETA de la lista de roles (por eso es PUT y no PATCH).",
+        "operationId": "asignar_roles_api_v1_usuarios__usuario_id__roles_put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/anuncios": {
+      "get": {
+        "tags": [
+          "Anuncios"
+        ],
+        "summary": "Ver el tablón de anuncios",
+        "description": "Devuelve los anuncios generales y los del servicio del usuario.\n\nLos anuncios caducados no se muestran (borrado lógico). Los destacados aparecen primero.",
+        "operationId": "listar_api_v1_anuncios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Anuncio"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Api V1 Anuncios Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Anuncios"
+        ],
+        "summary": "Publicar un anuncio",
+        "operationId": "crear_api_v1_anuncios_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnuncioIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Anuncio"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/guardias": {
+      "get": {
+        "tags": [
+          "Guardias"
+        ],
+        "summary": "Consultar guardias",
+        "operationId": "listar_api_v1_guardias_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrar por fecha (AAAA-MM-DD)",
+              "title": "Fecha"
+            },
+            "description": "Filtrar por fecha (AAAA-MM-DD)"
+          },
+          {
+            "name": "franja",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "manana",
+                    "tarde",
+                    "noche"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Franja"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Guardia"
+                  },
+                  "title": "Response Listar Api V1 Guardias Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardias/asignar": {
+      "post": {
+        "tags": [
+          "Guardias"
+        ],
+        "summary": "Asignar guardias por rondas",
+        "description": "Ejecuta el algoritmo por rondas para un hueco concreto (fecha + franja).\n\nEs POST porque **no es idempotente**: lanza un proceso que crea guardias nuevas y cuyo\nresultado puede variar (sorteo en caso de empate).",
+        "operationId": "asignar_api_v1_guardias_asignar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsignarGuardiaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Guardia"
+                  },
+                  "type": "array",
+                  "title": "Response Asignar Api V1 Guardias Asignar Post"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya asignadas o sin candidatos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/guardias/{guardia_id}": {
+      "patch": {
+        "tags": [
+          "Guardias"
+        ],
+        "summary": "Registrar quién realiza la guardia",
+        "description": "Actualización PARCIAL de la guardia: solo cambia `realizada_por` (y su estado).\n\nSuma 1 al contador de quien la REALIZA en ese hueco, que puede no coincidir con el asignado.",
+        "operationId": "registrar_realizacion_api_v1_guardias__guardia_id__patch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "guardia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Guardia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardiaPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guardia"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/ausencias": {
+      "post": {
+        "tags": [
+          "Ausencias"
+        ],
+        "summary": "Registrar una ausencia",
+        "operationId": "crear_api_v1_ausencias_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AusenciaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ausencia"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ausencias/{ausencia_id}/justificante": {
+      "post": {
+        "tags": [
+          "Ausencias"
+        ],
+        "summary": "Adjuntar justificante",
+        "description": "Solo aplica a las ausencias de tipo *genérica*. El fichero no se guarda en esta demo.",
+        "operationId": "justificar_api_v1_ausencias__ausencia_id__justificante_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ausencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ausencia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_justificar_api_v1_ausencias__ausencia_id__justificante_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ausencia"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ausencias/{ausencia_id}/pdf": {
+      "get": {
+        "tags": [
+          "Ausencias"
+        ],
+        "summary": "Descargar el documento PDF de la ausencia",
+        "description": "Genera el PDF autocompletando los datos personales del perfil (en el proyecto: cuenta de Google).",
+        "operationId": "documento_api_v1_ausencias__ausencia_id__pdf_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ausencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ausencia Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documento PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ausencias/{ausencia_id}/firma": {
+      "post": {
+        "tags": [
+          "Ausencias"
+        ],
+        "summary": "Firmar el documento",
+        "description": "Firma manuscrita (imagen capturada en pantalla) o electrónica con AutoFirma (mejor esfuerzo).",
+        "operationId": "firmar_api_v1_ausencias__ausencia_id__firma_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ausencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ausencia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirmaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ausencia"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "501": {
+            "description": "AutoFirma no disponible en la demo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Listar tickets",
+        "description": "Cada usuario ve los tickets que ha creado y los de los tipos de los que es responsable.",
+        "operationId": "listar_api_v1_tickets_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "mantenimiento",
+                    "suministros",
+                    "rrss"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pendiente",
+                    "en_curso",
+                    "finalizado"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  },
+                  "title": "Response Listar Api V1 Tickets Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Crear un ticket",
+        "operationId": "crear_api_v1_tickets_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{ticket_id}": {
+      "patch": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Cambiar el estado de un ticket",
+        "description": "Actualización PARCIAL: solo cambia el estado. Lo hace el responsable del tipo de ticket.",
+        "operationId": "cambiar_estado_api_v1_tickets__ticket_id__patch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reservas": {
+      "get": {
+        "tags": [
+          "Reservas"
+        ],
+        "summary": "Consultar reservas",
+        "operationId": "listar_api_v1_reservas_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recurso_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "sala-reuniones-1"
+              ],
+              "title": "Recurso Id"
+            }
+          },
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Reserva"
+                  },
+                  "title": "Response Listar Api V1 Reservas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Reservas"
+        ],
+        "summary": "Reservar sala o equipo",
+        "operationId": "crear_api_v1_reservas_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reserva"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Solapamiento con otra reserva",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/kpis": {
+      "get": {
+        "tags": [
+          "Dirección"
+        ],
+        "summary": "Indicadores para la dirección",
+        "operationId": "kpis_api_v1_dashboard_kpis_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auditoria": {
+      "get": {
+        "tags": [
+          "Dirección"
+        ],
+        "summary": "Consultar el registro de auditoría",
+        "operationId": "auditoria_api_v1_auditoria_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Usuario Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccessToken": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "AccessToken"
+      },
+      "Anuncio": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Titulo"
+          },
+          "cuerpo": {
+            "type": "string",
+            "title": "Cuerpo"
+          },
+          "servicio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servicio",
+            "description": "None = anuncio general para todo el centro"
+          },
+          "destacado": {
+            "type": "boolean",
+            "title": "Destacado",
+            "default": false
+          },
+          "caduca": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caduca"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "autor_id": {
+            "type": "string",
+            "title": "Autor Id"
+          },
+          "publicado": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publicado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo",
+          "cuerpo",
+          "id",
+          "autor_id",
+          "publicado"
+        ],
+        "title": "Anuncio"
+      },
+      "AnuncioIn": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Titulo"
+          },
+          "cuerpo": {
+            "type": "string",
+            "title": "Cuerpo"
+          },
+          "servicio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servicio",
+            "description": "None = anuncio general para todo el centro"
+          },
+          "destacado": {
+            "type": "boolean",
+            "title": "Destacado",
+            "default": false
+          },
+          "caduca": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caduca"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo",
+          "cuerpo"
+        ],
+        "title": "AnuncioIn"
+      },
+      "AsignarGuardiaIn": {
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha",
+            "examples": [
+              "2026-10-05"
+            ]
+          },
+          "franja": {
+            "type": "string",
+            "enum": [
+              "manana",
+              "tarde",
+              "noche"
+            ],
+            "title": "Franja",
+            "examples": [
+              "noche"
+            ]
+          },
+          "plazas": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Plazas",
+            "description": "Número de profesionales necesarios en ese hueco",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha",
+          "franja"
+        ],
+        "title": "AsignarGuardiaIn"
+      },
+      "Ausencia": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "generica",
+              "administrativa",
+              "actividad_externa"
+            ],
+            "title": "Tipo"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "dia_completo": {
+            "type": "boolean",
+            "title": "Dia Completo",
+            "default": true
+          },
+          "franjas": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "manana",
+                "tarde",
+                "noche"
+              ]
+            },
+            "type": "array",
+            "title": "Franjas",
+            "description": "Solo si no es día completo"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "usuario_id": {
+            "type": "string",
+            "title": "Usuario Id"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente_justificante",
+              "registrada",
+              "justificada",
+              "firmada"
+            ],
+            "title": "Estado"
+          },
+          "justificante": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Justificante"
+          },
+          "documento_generado": {
+            "type": "boolean",
+            "title": "Documento Generado",
+            "default": false
+          },
+          "firma": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firma"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "fecha",
+          "id",
+          "usuario_id",
+          "estado"
+        ],
+        "title": "Ausencia"
+      },
+      "AusenciaIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "generica",
+              "administrativa",
+              "actividad_externa"
+            ],
+            "title": "Tipo"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "dia_completo": {
+            "type": "boolean",
+            "title": "Dia Completo",
+            "default": true
+          },
+          "franjas": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "manana",
+                "tarde",
+                "noche"
+              ]
+            },
+            "type": "array",
+            "title": "Franjas",
+            "description": "Solo si no es día completo"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "fecha"
+        ],
+        "title": "AusenciaIn"
+      },
+      "Body_justificar_api_v1_ausencias__ausencia_id__justificante_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "PDF o imagen del justificante"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_justificar_api_v1_ausencias__ausencia_id__justificante_post"
+      },
+      "Error": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "Error"
+      },
+      "FirmaIn": {
+        "properties": {
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "manuscrita",
+              "autofirma"
+            ],
+            "title": "Metodo"
+          },
+          "imagen_base64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imagen Base64",
+            "description": "Imagen PNG de la firma capturada en pantalla"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metodo"
+        ],
+        "title": "FirmaIn"
+      },
+      "Guardia": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "franja": {
+            "type": "string",
+            "enum": [
+              "manana",
+              "tarde",
+              "noche"
+            ],
+            "title": "Franja"
+          },
+          "hueco": {
+            "type": "string",
+            "title": "Hueco",
+            "description": "Día de la semana + franja, p. ej. 'lunes-noche'"
+          },
+          "asignado_a": {
+            "type": "string",
+            "title": "Asignado A",
+            "description": "Profesional al que le corresponde por ronda"
+          },
+          "realizada_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizada Por",
+            "description": "Profesional que finalmente la realiza"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "asignada",
+              "realizada"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fecha",
+          "franja",
+          "hueco",
+          "asignado_a",
+          "estado"
+        ],
+        "title": "Guardia"
+      },
+      "GuardiaPatch": {
+        "properties": {
+          "realizada_por": {
+            "type": "string",
+            "title": "Realizada Por",
+            "description": "Id del profesional que finalmente cubre la guardia",
+            "examples": [
+              "u4"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "realizada_por"
+        ],
+        "title": "GuardiaPatch"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginGoogle": {
+        "properties": {
+          "id_token": {
+            "type": "string",
+            "title": "Id Token",
+            "description": "Token de Google. En DEMO_MODE, escribe el email del usuario.",
+            "examples": [
+              "ana.garcia@santarosadelima.es"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_token"
+        ],
+        "title": "LoginGoogle"
+      },
+      "RefreshIn": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshIn"
+      },
+      "Reserva": {
+        "properties": {
+          "recurso_id": {
+            "type": "string",
+            "title": "Recurso Id",
+            "examples": [
+              "sala-reuniones-1"
+            ]
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio",
+            "examples": [
+              "2026-10-06T10:00:00"
+            ]
+          },
+          "fin": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fin",
+            "examples": [
+              "2026-10-06T11:00:00"
+            ]
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "usuario_id": {
+            "type": "string",
+            "title": "Usuario Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recurso_id",
+          "inicio",
+          "fin",
+          "id",
+          "usuario_id"
+        ],
+        "title": "Reserva"
+      },
+      "ReservaIn": {
+        "properties": {
+          "recurso_id": {
+            "type": "string",
+            "title": "Recurso Id",
+            "examples": [
+              "sala-reuniones-1"
+            ]
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio",
+            "examples": [
+              "2026-10-06T10:00:00"
+            ]
+          },
+          "fin": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fin",
+            "examples": [
+              "2026-10-06T11:00:00"
+            ]
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recurso_id",
+          "inicio",
+          "fin"
+        ],
+        "title": "ReservaIn"
+      },
+      "RolesIn": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "examples": [
+              [
+                "personal",
+                "supervision"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "roles"
+        ],
+        "title": "RolesIn"
+      },
+      "Ticket": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "mantenimiento",
+              "suministros",
+              "rrss"
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Titulo"
+          },
+          "datos": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Datos",
+            "description": "Campos específicos del tipo de ticket (campo flexible)"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "solicitante_id": {
+            "type": "string",
+            "title": "Solicitante Id"
+          },
+          "responsable_rol": {
+            "type": "string",
+            "title": "Responsable Rol"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "en_curso",
+              "finalizado"
+            ],
+            "title": "Estado"
+          },
+          "creado": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado"
+          },
+          "historial": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Historial"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "titulo",
+          "id",
+          "solicitante_id",
+          "responsable_rol",
+          "estado",
+          "creado"
+        ],
+        "title": "Ticket"
+      },
+      "TicketIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "mantenimiento",
+              "suministros",
+              "rrss"
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Titulo"
+          },
+          "datos": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Datos",
+            "description": "Campos específicos del tipo de ticket (campo flexible)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "titulo"
+        ],
+        "title": "TicketIn"
+      },
+      "TicketPatch": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "en_curso",
+              "finalizado"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado"
+        ],
+        "title": "TicketPatch"
+      },
+      "Tokens": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token"
+        ],
+        "title": "Tokens"
+      },
+      "Usuario": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "servicio": {
+            "type": "string",
+            "title": "Servicio"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "pendiente",
+              "inactivo"
+            ],
+            "title": "Estado"
+          },
+          "disponibilidad": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disponibilidad",
+            "description": "Huecos de guardia, p. ej. 'lunes-noche'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "servicio",
+          "roles",
+          "estado"
+        ],
+        "title": "Usuario"
+      },
+      "UsuarioPatch": {
+        "properties": {
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "activo",
+                  "pendiente",
+                  "inactivo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "servicio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servicio"
+          }
+        },
+        "type": "object",
+        "title": "UsuarioPatch"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Pega aquí el access_token obtenido en POST /auth/google",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Login con Google (OAuth) y tokens JWT"
+    },
+    {
+      "name": "Usuarios",
+      "description": "Altas, estados y roles (administración)"
+    },
+    {
+      "name": "Anuncios",
+      "description": "Tablón de anuncios por servicio"
+    },
+    {
+      "name": "Guardias",
+      "description": "Asignación de guardias por rondas"
+    },
+    {
+      "name": "Ausencias",
+      "description": "Ausencias, justificante, PDF y firma"
+    },
+    {
+      "name": "Tickets",
+      "description": "Mantenimiento, suministros y publicaciones RRSS"
+    },
+    {
+      "name": "Reservas",
+      "description": "Salas y equipos sin solapamientos"
+    },
+    {
+      "name": "Dirección",
+      "description": "Indicadores y auditoría"
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Servidor local (python -m uvicorn app.main:app)"
+    }
+  ]
+}

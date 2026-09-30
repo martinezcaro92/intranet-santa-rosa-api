@@ -61,6 +61,7 @@ intranet-santa-rosa-api/
 │   ├── db.py              # Datos de ejemplo EN MEMORIA, auditoría y notificaciones
 │   ├── security.py        # JWT y control de roles mediante Depends()
 │   ├── schemas.py         # Modelos Pydantic (peticiones y respuestas)
+│   ├── documentacion.py   # Genera docs/openapi.json desde el código
 │   ├── routers/           # Un fichero por recurso de la API
 │   │   ├── auth.py        # /auth
 │   │   ├── usuarios.py    # /usuarios
@@ -74,15 +75,16 @@ intranet-santa-rosa-api/
 │       ├── guardias.py    # Algoritmo de asignación por rondas
 │       └── pdf.py         # Generador de PDF mínimo
 ├── tests/                 # Pruebas automatizadas con pytest
-├── docs/
-│   └── openapi-intranet-santa-rosa.yaml   # Contrato OpenAPI 3.0.3
+├── docs/                  # Carpeta publicada en GitHub Pages
+│   ├── index.html         # Página Swagger UI
+│   ├── openapi.json       # Generado desde el código (python -m app.documentacion)
+│   ├── openapi-intranet-santa-rosa.yaml   # Contrato OpenAPI 3.0.3 escrito a mano
+│   └── .nojekyll          # Indica a GitHub Pages que sirva los ficheros tal cual
 ├── scripts/
-│   └── export_openapi.py  # Genera la documentación estática desde el código
-├── site/
-│   └── index.html         # Página Swagger UI que se publica en GitHub Pages
+│   └── export_openapi.py  # Atajo equivalente a python -m app.documentacion
 ├── .github/workflows/
-│   └── pages.yml          # CI/CD: tests + publicación en GitHub Pages
-├── .gitlab-ci.yml         # Equivalente para GitLab Pages
+│   └── tests.yml          # CI opcional: ejecuta los tests en cada push
+├── .gitlab-ci.yml         # Tests y publicación en GitLab Pages
 ├── .env.example           # Plantilla de variables de entorno
 ├── requirements.txt
 ├── Dockerfile
@@ -129,10 +131,13 @@ source .venv/bin/activate
 
 Sabrás que está activo porque la línea de comandos empieza por `(.venv)`.
 
+> En Windows, si `python` no se reconoce o abre la Microsoft Store, usa el lanzador **`py`** en su lugar
+> (`py -m venv .venv`). Consulta también [Problemas frecuentes en Windows](#problemas-frecuentes-en-windows).
+
 ### 4.3. Instalar las dependencias
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ### 4.4. Configurar las variables de entorno
@@ -159,7 +164,7 @@ cp .env.example .env
 ### 4.5. Arrancar el servidor
 
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 Verás un mensaje parecido a `Uvicorn running on http://127.0.0.1:8000`. La opción `--reload` reinicia el
@@ -172,9 +177,24 @@ servidor automáticamente al guardar cambios en el código.
 | http://127.0.0.1:8000/openapi.json | Contrato OpenAPI generado por FastAPI |
 
 > **En el aula**, para que otros equipos de la red accedan al servidor:
-> `uvicorn app.main:app --host 0.0.0.0 --port 8000` y usa la IP del equipo (por ejemplo, `http://192.168.1.20:8000/docs`).
+> `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000` y usa la IP del equipo (por ejemplo, `http://192.168.1.20:8000/docs`).
 
 Para detener el servidor, pulsa `Ctrl + C`.
+
+> Se usa `python -m uvicorn` (y `python -m pip`) en lugar de `uvicorn` a secas porque funciona aunque la carpeta
+> de scripts de Python no esté en el `PATH`, algo habitual en Windows.
+
+### Problemas frecuentes en Windows
+
+| Error | Causa | Solución |
+|---|---|---|
+| `uvicorn : El término 'uvicorn' no se reconoce…` | Entorno virtual sin activar o `Scripts` fuera del `PATH` | Activa el entorno y usa `python -m uvicorn app.main:app --reload` |
+| `No module named uvicorn` | Faltan las dependencias en el entorno virtual | `python -m pip install -r requirements.txt` con el entorno activo |
+| `No Python at '"/usr/bin\python.exe'` | El `.venv` se creó con otro Python (Git Bash, WSL) o se copió de otro equipo | Bórralo con `Remove-Item -Recurse -Force .venv` y créalo de nuevo con `py -m venv .venv` |
+| `…Activate.ps1 no se puede cargar… ejecución de scripts está deshabilitada` | Política de ejecución de PowerShell | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (una sola vez) |
+| `python` abre la Microsoft Store | Alias de Windows, no es Python real | Instala Python desde python.org (marcando *Add python.exe to PATH*) o usa `py` |
+
+> Un entorno virtual solo funciona en el equipo donde se creó: **nunca se copia ni se sube** al repositorio.
 
 ## 5. Probar la API desde el navegador (Swagger UI)
 
@@ -381,72 +401,87 @@ personales reales.
 
 ## 14. Documentación pública en GitHub Pages (Swagger)
 
-El repositorio incluye un flujo de **CI/CD** que publica la documentación interactiva de la API en
-**GitHub Pages**, con el mismo aspecto que `/docs`, en una dirección pública como:
+La carpeta **`docs/`** contiene una página Swagger UI que GitHub Pages publica directamente, sin flujos de CI/CD.
+El resultado es una dirección pública como:
 
 ```
 https://TU_USUARIO.github.io/intranet-santa-rosa-api/
 ```
 
-### Cómo funciona
+La página tiene un selector (**Select a definition**) para alternar entre la API **generada desde el código**
+(`openapi.json`) y el **contrato de diseño** (`openapi-intranet-santa-rosa.yaml`).
 
-GitHub Pages solo sirve ficheros estáticos: **no puede ejecutar FastAPI**. Por eso, en cada `push` a `main`,
-el flujo `.github/workflows/pages.yml`:
+### Paso 1. Generar `docs/openapi.json` desde el código
 
-1. Instala las dependencias y **ejecuta los tests**. Si alguno falla, no se publica nada.
-2. Ejecuta `scripts/export_openapi.py`, que importa la aplicación y genera `openapi.json` **a partir del código**.
-   La documentación publicada nunca se desfasa respecto a la API real.
-3. Publica la carpeta `site/`: la página `index.html` (Swagger UI), el `openapi.json` generado y el contrato YAML.
+Con el entorno virtual activo, desde la raíz del proyecto:
 
-La página tiene un selector (**Select a definition**) para alternar entre la API **generada desde el código** y el
-**contrato de diseño** (YAML). Así es fácil comprobar si la implementación cumple lo diseñado.
+```bash
+python -m app.documentacion
+```
 
-### Activarlo (una sola vez)
+Repite este comando **cada vez que cambies la API** (rutas, esquemas, descripciones). Si se te olvida, el test
+`tests/test_documentacion.py` fallará con el mensaje «docs/openapi.json está desactualizado».
 
-1. Sube el proyecto a GitHub (apartado 13). El repositorio debe ser **público**, o de un plan que permita Pages.
-2. En el repositorio: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Haz cualquier `push` a `main`, o ve a **Actions → Documentación de la API en GitHub Pages → Run workflow**.
-4. Cuando el flujo termine (icono verde ✅), la URL aparece en **Settings → Pages** y en el resumen del flujo.
+### Paso 2. Subir los cambios
+
+```bash
+git add docs/openapi.json
+git commit -m "docs: actualiza la documentación de la API"
+git push
+```
+
+Comprueba en GitHub que `openapi.json` aparece dentro de la carpeta `docs/`.
+
+### Paso 3. Activar GitHub Pages (una sola vez)
+
+1. En el repositorio: **Settings → Pages → Build and deployment**.
+2. **Source:** `Deploy from a branch`.
+3. **Branch:** `main` y carpeta **`/docs`** → **Save**.
+4. Espera uno o dos minutos. La URL aparece en la parte superior de esa misma página.
+
+> El repositorio debe ser **público**, o de un plan que permita Pages en repositorios privados.
+
+### Ver la página en local antes de subirla
+
+```bash
+python -m http.server 8080 --directory docs
+```
+
+Abre http://localhost:8080. No sirve abrir `docs/index.html` con doble clic: el navegador no permite cargar
+ficheros desde el disco.
 
 ### Probar endpoints desde la página publicada («Try it out»)
 
-La página documenta la API, pero las peticiones se envían al servidor elegido en **Servers**:
+La página es estática: documenta la API, pero las peticiones se envían al servidor elegido en **Servers**.
 
-- **Servidor local** (`http://127.0.0.1:8000`): arranca la API en tu equipo con `uvicorn app.main:app` y usa la página
-  publicada como cliente. La API ya permite peticiones desde otros orígenes (CORS).
-  Algunos navegadores piden permiso, o bloquean, las peticiones de una web pública hacia `localhost`.
-  En ese caso, usa directamente `http://127.0.0.1:8000/docs`.
-- **API desplegada** (opcional): si publicas la API en un servicio de alojamiento, crea la variable
-  **Settings → Secrets and variables → Actions → Variables → `PUBLIC_API_URL`** con su dirección
-  (p. ej. `https://mi-api.onrender.com`). En la siguiente publicación aparecerá como primer servidor.
+- **Servidor local** (`http://127.0.0.1:8000`): arranca la API en tu equipo (`python -m uvicorn app.main:app`) y usa
+  la página publicada como cliente. La API permite peticiones desde otros orígenes (CORS). Algunos navegadores piden
+  permiso, o bloquean, las peticiones de una web pública hacia `localhost`; en ese caso usa `http://127.0.0.1:8000/docs`.
+- **API desplegada** (opcional): genera la documentación indicando su dirección y vuelve a subirla:
+  ```powershell
+  # Windows (PowerShell)
+  $env:PUBLIC_API_URL="https://mi-api.onrender.com"; python -m app.documentacion
+  ```
+  ```bash
+  # Linux / macOS
+  PUBLIC_API_URL=https://mi-api.onrender.com python -m app.documentacion
+  ```
 
-### Ver la página en local antes de publicarla
-
-```bash
-python scripts/export_openapi.py
-python -m http.server 8080 --directory site
-```
-
-Abre http://localhost:8080. Los ficheros generados (`site/openapi.json` y `site/*.yaml`) no se suben al
-repositorio: los crea el flujo de CI/CD en cada publicación.
-
-### Problemas frecuentes: «No se ha encontrado openapi.json»
-
-`openapi.json` **no está en el repositorio**: lo genera el flujo de CI/CD en cada publicación. Si la página no lo
-encuentra, muestra un aviso con la causa y carga el contrato YAML como alternativa. Revisa, por este orden:
+### Problemas frecuentes: «No se ha encontrado openapi.json» o «Fetch error 404»
 
 | Síntoma | Causa | Solución |
 |---|---|---|
-| La URL solo funciona añadiendo `/site/` | Pages publica los ficheros del repositorio (*Deploy from a branch*) | **Settings → Pages → Source: GitHub Actions** y vuelve a ejecutar el flujo |
-| No aparece ningún flujo en la pestaña *Actions* | Falta la carpeta `.github/` (se sube desde la web arrastrando carpetas y está oculta) o el proyecto está dentro de una subcarpeta | Sube el proyecto con `git push` (apartado 13) y comprueba que `.github/`, `app/` y `README.md` están en la **raíz** |
-| El flujo aparece en rojo ❌ | Ha fallado un test o la generación | Abre el flujo en *Actions* y lee el paso que ha fallado |
-| Error `Branch "…" is not allowed to deploy to github-pages` | Rama distinta de la permitida | En **Settings → Environments → github-pages**, añade tu rama en *Deployment branches* |
-| Falla al abrir `site/index.html` con doble clic | El navegador no permite cargar ficheros desde el disco | Usa un servidor local (ver «Ver la página en local») |
+| Error 404 al cargar `openapi.json` | El fichero no se ha generado o no se ha subido | Paso 1 y paso 2; comprueba que está en `docs/` en GitHub |
+| `git status` no muestra `docs/openapi.json` | El fichero está ignorado | Revisa que no aparezca en `.gitignore` |
+| La URL muestra el README y no Swagger | Pages publica la raíz en lugar de `/docs` | Paso 3: carpeta **/docs** |
+| Los cambios no se ven | Publicación en curso o caché del navegador | Espera 1-2 minutos y recarga con `Ctrl + F5` |
 
-### ¿Y en GitLab?
+### Integración continua (opcional)
 
-El fichero `.gitlab-ci.yml` hace lo mismo en **GitLab Pages**: ejecuta los tests y publica la carpeta `public/`.
-Tras el primer `push`, la URL aparece en **Deploy → Pages**.
+- **GitHub:** `.github/workflows/tests.yml` ejecuta los tests en cada `push`. Si alguien olvida regenerar
+  `openapi.json`, el flujo aparece en rojo. La publicación **no depende** de este flujo.
+- **GitLab:** `.gitlab-ci.yml` ejecuta los tests y publica la carpeta `docs/` en **GitLab Pages**
+  (la URL aparece en **Deploy → Pages**).
 
 > ⚠️ La documentación publicada es **pública**. No incluyas nunca en descripciones o ejemplos datos personales reales,
 > claves ni direcciones de servidores internos.

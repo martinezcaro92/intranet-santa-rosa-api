@@ -1,4 +1,5 @@
-# Equivalente para GitLab Pages: el job debe llamarse "pages" y publicar la carpeta public/.
+# GitLab Pages: el job debe llamarse "pages" y publicar la carpeta public/.
+# Se publica la carpeta docs/ tal cual (incluido docs/openapi.json, que está en el repositorio).
 image: python:3.12-slim
 
 stages: [test, deploy]
@@ -12,8 +13,7 @@ pruebas:
 pages:
   stage: deploy
   script:
-    - pip install -r requirements.txt
-    - python scripts/export_openapi.py public
+    - cp -r docs public
   artifacts:
     paths:
       - public

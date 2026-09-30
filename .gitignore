@@ -15,7 +15,6 @@ htmlcov/
 .idea/
 .DS_Store
 
-# Documentación generada automáticamente (la genera el pipeline de CI/CD)
-site/openapi.json
-site/*.yaml
+
+# Copia de la documentación para GitLab Pages (la genera el pipeline)
 public/
