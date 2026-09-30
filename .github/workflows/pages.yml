@@ -4,7 +4,7 @@ name: Documentación de la API en GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:   # permite lanzarlo a mano desde la pestaña Actions
 
 permissions:
@@ -40,6 +40,12 @@ jobs:
           # Opcional: URL de la API desplegada (Settings › Secrets and variables › Actions › Variables)
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
         run: python scripts/export_openapi.py site
+
+      - name: Comprobar el contenido que se va a publicar
+        run: |
+          test -f site/index.html   || { echo "::error::Falta site/index.html"; exit 1; }
+          test -f site/openapi.json || { echo "::error::No se ha generado site/openapi.json"; exit 1; }
+          ls -la site
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5

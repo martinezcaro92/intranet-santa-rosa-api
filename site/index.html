@@ -17,6 +17,12 @@
              background: var(--claro); border-left: 5px solid var(--verde); border-radius: 4px;
              color: #1F2937; font-size: 14px; line-height: 1.5; }
     .aviso code { background: #fff; padding: 1px 5px; border-radius: 3px; }
+    .diagnostico { max-width: 1460px; margin: 12px auto 0; padding: 12px 18px; box-sizing: border-box;
+                   background: #FDECEC; border-left: 5px solid #B91C1C; border-radius: 4px; color: #1F2937;
+                   font-size: 14px; line-height: 1.55; display: none; }
+    .diagnostico h2 { margin: 0 0 6px; font-size: 16px; color: #B91C1C; }
+    .diagnostico ol { margin: 6px 0 0 18px; padding: 0; }
+    .diagnostico code { background: #fff; padding: 1px 5px; border-radius: 3px; }
     /* Integración de la barra superior de Swagger con los colores del proyecto */
     .swagger-ui .topbar { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 8px 0; }
     .swagger-ui .topbar .download-url-wrapper .select-label { color: var(--marino); }
@@ -44,28 +50,76 @@
     usa <code>http://127.0.0.1:8000/docs</code>.
   </div>
 
+  <div id="diagnostico" class="diagnostico"></div>
   <div id="swagger-ui"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-standalone-preset.js"></script>
   <script>
-    window.ui = SwaggerUIBundle({
-      urls: [
-        { url: "openapi.json", name: "Generada desde el código (FastAPI)" },
-        { url: "openapi-intranet-santa-rosa.yaml", name: "Contrato de diseño (YAML)" }
-      ],
-      "urls.primaryName": "Generada desde el código (FastAPI)",
-      dom_id: "#swagger-ui",
-      deepLinking: true,
-      docExpansion: "list",
-      defaultModelsExpandDepth: 0,
-      persistAuthorization: true,
-      displayRequestDuration: true,
-      filter: true,
-      tryItOutEnabled: false,
-      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-      layout: "StandaloneLayout"
-    });
+    // Definiciones que puede mostrar la página, por orden de preferencia.
+    // "openapi.json" lo genera el flujo de CI/CD (no está en el repositorio).
+    const CANDIDATOS = [
+      { url: "openapi.json", name: "Generada desde el código (FastAPI)" },
+      { url: "openapi-intranet-santa-rosa.yaml", name: "Contrato de diseño (YAML)" },
+      { url: "../docs/openapi-intranet-santa-rosa.yaml", name: "Contrato de diseño (YAML)" }
+    ];
+
+    async function existe(url) {
+      try { return (await fetch(url, { cache: "no-store" })).ok; } catch (e) { return false; }
+    }
+
+    function diagnosticar(hayAlternativa) {
+      const caja = document.getElementById("diagnostico");
+      const enGitHub = location.hostname.endsWith("github.io");
+      const enGitLab = location.hostname.includes("gitlab.io");
+      let causas;
+      if (location.protocol === "file:") {
+        causas = `<li>Has abierto <code>index.html</code> directamente desde el disco. El navegador no permite cargar
+          ficheros así. Desde la raíz del proyecto ejecuta <code>python scripts/export_openapi.py</code> y después
+          <code>python -m http.server 8080 --directory site</code>, y abre <code>http://localhost:8080</code>.</li>`;
+      } else if (enGitHub || enGitLab) {
+        causas = `
+          <li><strong>Origen de Pages incorrecto.</strong> En <em>Settings → Pages → Build and deployment</em>, el campo
+              <em>Source</em> debe ser <strong>GitHub Actions</strong> (no <em>Deploy from a branch</em>).</li>
+          <li><strong>El flujo no se ha ejecutado o ha fallado.</strong> Revisa la pestaña <em>Actions</em>: el flujo
+              «Documentación de la API en GitHub Pages» debe aparecer en verde. Puedes lanzarlo con <em>Run workflow</em>.</li>
+          <li><strong>Falta la carpeta <code>.github</code></strong> en el repositorio. Los exploradores de archivos ocultan
+              las carpetas que empiezan por punto y no se suben al arrastrarlas a la web. Súbela con <code>git push</code>.</li>
+          <li><strong>El proyecto está dentro de una subcarpeta.</strong> <code>.github/</code>, <code>app/</code> y
+              <code>README.md</code> deben estar en la <em>raíz</em> del repositorio, no dentro de otra carpeta.</li>`;
+      } else {
+        causas = `<li>Falta generar la documentación. Ejecuta <code>python scripts/export_openapi.py</code> desde la raíz
+          del proyecto y recarga la página.</li>`;
+      }
+      caja.innerHTML = `<h2>No se ha encontrado <code>openapi.json</code></h2>
+        ${hayAlternativa ? "Se muestra el <strong>contrato de diseño (YAML)</strong> como alternativa. " : ""}
+        Causas probables:<ol>${causas}</ol>`;
+      caja.style.display = "block";
+    }
+
+    (async () => {
+      const disponibles = [];
+      for (const c of CANDIDATOS) {
+        if (!disponibles.some(d => d.name === c.name) && await existe(c.url)) disponibles.push(c);
+      }
+      if (!disponibles.some(d => d.url === "openapi.json")) diagnosticar(disponibles.length > 0);
+      if (disponibles.length === 0) return;
+
+      window.ui = SwaggerUIBundle({
+        urls: disponibles,
+        "urls.primaryName": disponibles[0].name,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        docExpansion: "list",
+        defaultModelsExpandDepth: 0,
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: true,
+        tryItOutEnabled: false,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "StandaloneLayout"
+      });
+    })();
   </script>
 </body>
 </html>

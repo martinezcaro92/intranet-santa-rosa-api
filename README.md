@@ -1,5 +1,5 @@
 # Intranet · Centro Médico Santa Rosa de Lima — API REST
- 
+
 API de ejemplo de la **intranet de gestión** de un centro médico, desarrollada con **FastAPI** para el
 **Proyecto Intermodular del CFGS Desarrollo de Aplicaciones Web (DAW)**.
 
@@ -429,6 +429,19 @@ python -m http.server 8080 --directory site
 
 Abre http://localhost:8080. Los ficheros generados (`site/openapi.json` y `site/*.yaml`) no se suben al
 repositorio: los crea el flujo de CI/CD en cada publicación.
+
+### Problemas frecuentes: «No se ha encontrado openapi.json»
+
+`openapi.json` **no está en el repositorio**: lo genera el flujo de CI/CD en cada publicación. Si la página no lo
+encuentra, muestra un aviso con la causa y carga el contrato YAML como alternativa. Revisa, por este orden:
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| La URL solo funciona añadiendo `/site/` | Pages publica los ficheros del repositorio (*Deploy from a branch*) | **Settings → Pages → Source: GitHub Actions** y vuelve a ejecutar el flujo |
+| No aparece ningún flujo en la pestaña *Actions* | Falta la carpeta `.github/` (se sube desde la web arrastrando carpetas y está oculta) o el proyecto está dentro de una subcarpeta | Sube el proyecto con `git push` (apartado 13) y comprueba que `.github/`, `app/` y `README.md` están en la **raíz** |
+| El flujo aparece en rojo ❌ | Ha fallado un test o la generación | Abre el flujo en *Actions* y lee el paso que ha fallado |
+| Error `Branch "…" is not allowed to deploy to github-pages` | Rama distinta de la permitida | En **Settings → Environments → github-pages**, añade tu rama en *Deployment branches* |
+| Falla al abrir `site/index.html` con doble clic | El navegador no permite cargar ficheros desde el disco | Usa un servidor local (ver «Ver la página en local») |
 
 ### ¿Y en GitLab?
 
