@@ -36,7 +36,8 @@ los endpoints de vuestro propio backend.
 11. [Contrato OpenAPI y editor.swagger.io](#11-contrato-openapi-y-editorswaggerio)
 12. [Limitaciones: qué está simulado](#12-limitaciones-qué-está-simulado)
 13. [Publicar el proyecto en GitHub o GitLab](#13-publicar-el-proyecto-en-github-o-gitlab)
-14. [Licencia](#14-licencia)
+14. [Documentación pública en GitHub Pages (Swagger)](#14-documentación-pública-en-github-pages-swagger)
+15. [Licencia](#15-licencia)
 
 ---
 
@@ -75,6 +76,13 @@ intranet-santa-rosa-api/
 ├── tests/                 # Pruebas automatizadas con pytest
 ├── docs/
 │   └── openapi-intranet-santa-rosa.yaml   # Contrato OpenAPI 3.0.3
+├── scripts/
+│   └── export_openapi.py  # Genera la documentación estática desde el código
+├── site/
+│   └── index.html         # Página Swagger UI que se publica en GitHub Pages
+├── .github/workflows/
+│   └── pages.yml          # CI/CD: tests + publicación en GitHub Pages
+├── .gitlab-ci.yml         # Equivalente para GitLab Pages
 ├── .env.example           # Plantilla de variables de entorno
 ├── requirements.txt
 ├── Dockerfile
@@ -371,6 +379,65 @@ OpenAPI 3.0.3. Se recomienda **diseñar primero el contrato y después programar
 Buenas prácticas: commits pequeños y descriptivos (evita un único «subida final») y nunca subas claves ni datos
 personales reales.
 
-## 14. Licencia
+## 14. Documentación pública en GitHub Pages (Swagger)
+
+El repositorio incluye un flujo de **CI/CD** que publica la documentación interactiva de la API en
+**GitHub Pages**, con el mismo aspecto que `/docs`, en una dirección pública como:
+
+```
+https://TU_USUARIO.github.io/intranet-santa-rosa-api/
+```
+
+### Cómo funciona
+
+GitHub Pages solo sirve ficheros estáticos: **no puede ejecutar FastAPI**. Por eso, en cada `push` a `main`,
+el flujo `.github/workflows/pages.yml`:
+
+1. Instala las dependencias y **ejecuta los tests**. Si alguno falla, no se publica nada.
+2. Ejecuta `scripts/export_openapi.py`, que importa la aplicación y genera `openapi.json` **a partir del código**.
+   La documentación publicada nunca se desfasa respecto a la API real.
+3. Publica la carpeta `site/`: la página `index.html` (Swagger UI), el `openapi.json` generado y el contrato YAML.
+
+La página tiene un selector (**Select a definition**) para alternar entre la API **generada desde el código** y el
+**contrato de diseño** (YAML). Así es fácil comprobar si la implementación cumple lo diseñado.
+
+### Activarlo (una sola vez)
+
+1. Sube el proyecto a GitHub (apartado 13). El repositorio debe ser **público**, o de un plan que permita Pages.
+2. En el repositorio: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Haz cualquier `push` a `main`, o ve a **Actions → Documentación de la API en GitHub Pages → Run workflow**.
+4. Cuando el flujo termine (icono verde ✅), la URL aparece en **Settings → Pages** y en el resumen del flujo.
+
+### Probar endpoints desde la página publicada («Try it out»)
+
+La página documenta la API, pero las peticiones se envían al servidor elegido en **Servers**:
+
+- **Servidor local** (`http://127.0.0.1:8000`): arranca la API en tu equipo con `uvicorn app.main:app` y usa la página
+  publicada como cliente. La API ya permite peticiones desde otros orígenes (CORS).
+  Algunos navegadores piden permiso, o bloquean, las peticiones de una web pública hacia `localhost`.
+  En ese caso, usa directamente `http://127.0.0.1:8000/docs`.
+- **API desplegada** (opcional): si publicas la API en un servicio de alojamiento, crea la variable
+  **Settings → Secrets and variables → Actions → Variables → `PUBLIC_API_URL`** con su dirección
+  (p. ej. `https://mi-api.onrender.com`). En la siguiente publicación aparecerá como primer servidor.
+
+### Ver la página en local antes de publicarla
+
+```bash
+python scripts/export_openapi.py
+python -m http.server 8080 --directory site
+```
+
+Abre http://localhost:8080. Los ficheros generados (`site/openapi.json` y `site/*.yaml`) no se suben al
+repositorio: los crea el flujo de CI/CD en cada publicación.
+
+### ¿Y en GitLab?
+
+El fichero `.gitlab-ci.yml` hace lo mismo en **GitLab Pages**: ejecuta los tests y publica la carpeta `public/`.
+Tras el primer `push`, la URL aparece en **Deploy → Pages**.
+
+> ⚠️ La documentación publicada es **pública**. No incluyas nunca en descripciones o ejemplos datos personales reales,
+> claves ni direcciones de servidores internos.
+
+## 15. Licencia
 
 Distribuido bajo licencia **MIT**. Consulta el fichero [LICENSE](LICENSE).

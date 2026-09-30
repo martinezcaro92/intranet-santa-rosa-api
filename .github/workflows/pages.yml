@@ -1,0 +1,61 @@
+# Publica la documentación de la API (Swagger UI) en GitHub Pages.
+# En cada push a main: ejecuta los tests, genera openapi.json desde el código y despliega.
+name: Documentación de la API en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar las pruebas (si fallan, no se publica)
+        run: pytest
+
+      - name: Generar la documentación desde el código
+        env:
+          # Opcional: URL de la API desplegada (Settings › Secrets and variables › Actions › Variables)
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: python scripts/export_openapi.py site
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir el sitio generado
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

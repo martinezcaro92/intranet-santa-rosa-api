@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Intranet · Centro Médico Santa Rosa de Lima</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui.css">
+  <style>
+    :root { --verde: #1D8A5E; --marino: #1F2A44; --gris: #6B7280; --claro: #EAF6F0; }
+    body { margin: 0; font-family: Arial, "Liberation Sans", Helvetica, sans-serif; background: #fff; }
+    .cabecera { background: var(--marino); color: #fff; padding: 18px 24px 16px; border-bottom: 4px solid var(--verde); }
+    .cabecera small { color: #9FE3C4; font-weight: bold; letter-spacing: .06em; font-size: 12px; }
+    .cabecera h1 { margin: 4px 0 2px; font-size: 24px; }
+    .cabecera p { margin: 0; color: #CBD5E1; font-size: 14px; }
+    .aviso { max-width: 1460px; margin: 16px auto 0; padding: 10px 16px; box-sizing: border-box;
+             background: var(--claro); border-left: 5px solid var(--verde); border-radius: 4px;
+             color: #1F2937; font-size: 14px; line-height: 1.5; }
+    .aviso code { background: #fff; padding: 1px 5px; border-radius: 3px; }
+    /* Integración de la barra superior de Swagger con los colores del proyecto */
+    .swagger-ui .topbar { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 8px 0; }
+    .swagger-ui .topbar .download-url-wrapper .select-label { color: var(--marino); }
+    .swagger-ui .topbar .download-url-wrapper .select-label span { font-weight: bold; }
+    .swagger-ui .topbar .download-url-wrapper select { border: 2px solid var(--verde); }
+    .swagger-ui .topbar-wrapper .link { visibility: hidden; }
+    .swagger-ui .info .title { color: var(--marino); }
+    .swagger-ui .btn.authorize { color: var(--verde); border-color: var(--verde); }
+    .swagger-ui .btn.authorize svg { fill: var(--verde); }
+    .swagger-ui .opblock-tag { color: var(--marino); }
+  </style>
+</head>
+<body>
+  <header class="cabecera">
+    <small>PROYECTO INTERMODULAR · DAW</small>
+    <h1>API de la Intranet · Centro Médico Santa Rosa de Lima</h1>
+    <p>Documentación interactiva generada automáticamente desde el código en cada publicación.</p>
+  </header>
+
+  <div class="aviso">
+    <strong>Para usar «Try it out»</strong>: esta página es estática y no ejecuta la API. Arranca el servidor en tu equipo
+    (<code>uvicorn app.main:app</code>) y elige <code>http://127.0.0.1:8000</code> en <em>Servers</em>.
+    Inicia sesión en <code>POST /api/v1/auth/google</code> (en <code>id_token</code>, el email de un usuario de ejemplo),
+    copia el <code>access_token</code> y pégalo en <strong>Authorize</strong>. Si el navegador bloquea la petición,
+    usa <code>http://127.0.0.1:8000/docs</code>.
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      urls: [
+        { url: "openapi.json", name: "Generada desde el código (FastAPI)" },
+        { url: "openapi-intranet-santa-rosa.yaml", name: "Contrato de diseño (YAML)" }
+      ],
+      "urls.primaryName": "Generada desde el código (FastAPI)",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      docExpansion: "list",
+      defaultModelsExpandDepth: 0,
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      filter: true,
+      tryItOutEnabled: false,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      layout: "StandaloneLayout"
+    });
+  </script>
+</body>
+</html>

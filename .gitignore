@@ -14,3 +14,8 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Documentación generada automáticamente (la genera el pipeline de CI/CD)
+site/openapi.json
+site/*.yaml
+public/

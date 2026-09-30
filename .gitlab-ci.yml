@@ -1,0 +1,21 @@
+# Equivalente para GitLab Pages: el job debe llamarse "pages" y publicar la carpeta public/.
+image: python:3.12-slim
+
+stages: [test, deploy]
+
+pruebas:
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - pytest
+
+pages:
+  stage: deploy
+  script:
+    - pip install -r requirements.txt
+    - python scripts/export_openapi.py public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
