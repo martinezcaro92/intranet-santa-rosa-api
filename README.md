@@ -1,5 +1,5 @@
 # Intranet · Centro Médico Santa Rosa de Lima — API REST
-
+ 
 API de ejemplo de la **intranet de gestión** de un centro médico, desarrollada con **FastAPI** para el
 **Proyecto Intermodular del CFGS Desarrollo de Aplicaciones Web (DAW)**.
 
