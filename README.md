@@ -7,6 +7,8 @@ Es un escenario **equivalente** al de la intranet del centro educativo: cambia e
 pero se mantienen los mismos patrones. Sirve como referencia de cómo definir, documentar, implementar y probar
 los endpoints de vuestro propio backend.
 
+
+
 | Proyecto del centro educativo | Este ejemplo (centro médico) |
 |---|---|
 | Guardias del profesorado por rondas | Guardias médicas por rondas |
